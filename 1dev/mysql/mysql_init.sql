@@ -1,0 +1,4 @@
+CREATE DATABASE IF NOT EXISTS gobase_one;
+CREATE DATABASE IF NOT EXISTS gobase_two;
+
+GRANT ALL PRIVILEGES ON *.* TO 'mysqluser'@'%';
