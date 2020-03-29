@@ -1,7 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/sirupsen/logrus"
+	"sync"
 	"time"
 )
 
@@ -9,13 +12,6 @@ const (
 	// Environment variable prefix
 	evPrefix = ""
 )
-
-// Config stores service configurations
-type Config struct {
-	Svc service
-	Log log
-	Db  database
-}
 
 // FromEnvVar creates Config from environment variables.
 // Defaults are not set and all environment variables are marked as required.
@@ -35,6 +31,38 @@ func Help() error {
 	return envconfig.Usage(evPrefix, &cfg)
 }
 
+// Config stores service configurations
+//
+// note: create new struct and inject logger
+// other methods to satisfy config interfaces should also be tied to new struct
+type Config struct {
+	// Variables
+	Svc service
+	Log log
+	Db  database
+
+	// Logger
+	initLogger sync.Once
+	logger     *logrus.Logger
+}
+
+// Logger returns singleton logger
+func (c *Config) Logger() *logrus.Logger {
+	c.initLogger.Do(func() {
+		c.logger = logrus.New()
+		c.logger.SetLevel(c.Log.Level)
+	})
+	return c.logger
+}
+
+// MySqlDsn generates mysql dsn from config variables
+func (c *Config) MySqlDsn() string {
+	opt := "&parseTime=true"
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?tls=%s",
+		c.Db.User, c.Db.Pass, c.Db.Host, c.Db.Port, c.Db.Name, c.Db.SSL) + opt
+	return dsn
+}
+
 type service struct {
 	Profile string        `required:"true" desc:"[local,prod] service profile "`
 	Port    string        `required:"true" desc:"[8080] server port "`
@@ -42,7 +70,7 @@ type service struct {
 }
 
 type log struct {
-	Level string `required:"true" desc:"[info,debug] log levels "`
+	Level logrus.Level `required:"true" desc:"[info,debug] log levels "`
 }
 
 type database struct {
